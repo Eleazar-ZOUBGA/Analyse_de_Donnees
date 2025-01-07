@@ -1,0 +1,305 @@
+---
+title: "Projet d'Analyse de données"
+date: "3MIC - 2024-2025"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 4
+    number_sections: yes
+---
+
+```{css,echo=F}
+.badCode {
+background-color: #C9DDE4;
+}
+
+.corrO { background-color: rgb(255,238,237); }
+.corrS { background-color: pink; color: black; border: 1px solid red; }
+```
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               class.source="badCode")
+opts_knit$set(width=75)
+```
+
+```{r,echo=F, error=F,warning=F}
+library(corrplot)
+library(ggplot2)
+library(gridExtra)
+library(FactoMineR)
+library(factoextra)
+library(reshape2)
+```
+
+
+# Introduction
+
+## Descriptîon du jeu de données
+```{r}
+gen <- read.table("DataProjet3MIC-2425.txt",header=T)
+summary(gen)
+```
+
+# Conclusion
+
+Les données étudiées dans ce TP ont été recueillies à Rennes dans $112$ stations durant l'été 2001. Les 13 variables observées sont :
+
++ maxO3 : Maximum de concentration d'ozone observé sur la journée en $\mu$gr/m3
++ T9, T12, T15 : Température observée à 9, 12 et 15h
++ Ne9, Ne12, Ne15 : Nébulosité observée à 9, 12 et 15h
++ Vx9, Vx12, Vx15 : Composante E-O du vent à 9, 12 et 15h
++ vent : orientation du vent à 12h
++ pluie : occurrence ou non de précipitations
++ maxO3v : Maximum de concentration d'ozone observé la veille 
+
+On charge les données, on transforme les variables qualitatives *pluie* et *vent*, et on supprime la dernière variable que l'on n'utilisera pas dans ce TP. 
+
+```{r,eval=F}
+Ozone<-read.table("Ozone.txt",header=T)
+Ozone$pluie<-as.factor(Ozone$pluie)
+Ozone$vent<-as.factor(Ozone$vent)
+Ozone<-Ozone[,-11]
+summary(Ozone)   
+```
+
+Ainsi on a un jeu de données composé de $n=112$ individus et $p=12$ variables.
+
+```{r,eval=F}
+dim(Ozone)
+```
+
+
+**Question :** Pour vous familiariser avec le jeu de données, quelques statistiques descriptives ont été programmées. Commentez les résultats.
+
+
+```{r,eval=F}
+ggplot(melt(Ozone[,-c(11,12)]),aes(x=variable,y=value))+geom_boxplot()
+
+g1<-ggplot(Ozone,aes(x=maxO3))+geom_density()
+g2<-ggplot(melt(Ozone[,c(2:4)]),aes(x=value,color=variable))+geom_density()
+g3<-ggplot(melt(Ozone[,c(5:7)]),aes(x=value,color=variable))+geom_density()
+g4<-ggplot(melt(Ozone[,c(8:10)]),aes(x=value,color=variable))+geom_density()
+grid.arrange(g1,g2,g3,g4,ncol=2)
+
+ggplot(Ozone, aes(x = pluie)) +  
+  geom_bar(aes(y = (..count..)/sum(..count..)))+ylab("")+ggtitle("Frequences")
+
+quan <- as.vector(table(Ozone$vent))/nrow(Ozone)
+df <- data.frame(group = levels(Ozone$vent),value = quan)
+ggplot(df, aes(x="", y=value, fill=group))+geom_bar(width = 1, stat = "identity")+ coord_polar("y", start=0)+ theme(legend.position="bottom")
+```
+
+**Question :** Représentez graphiquement les corrélations des
+variables quantitatives (vous pourrez utiliser la fonction `corrplot()`).
+Quelles sont les variables linéairement corrélées (ou non) ?
+
+```{r}
+# A COMPLETER
+oquanti=Ozone[,-c(11,12)]
+corrplot(cor(oquanti),method="ellipse")
+```
+
+
+# ACP centrée
+
+Dans cette section, on décide de faire une analyse en composantes principales (ACP) sur les données centrées. A l'aide de la fonction `scale()`, centrez les données. Vérifiez que les variables sont bien centrées avec `apply(...,2,mean)`.
+
+```{r,eval=F}
+OzoneC<-scale(Ozone[,-c(11,12)],center=TRUE,scale=FALSE) # A COMPLETER
+apply(OzoneC,2,mean)
+```
+
+
+
+## A la main
+**Question **: A l'aide de la fonction `diag()`, créez la matrice de poids $W=\frac 1 n I_n$ et la métrique $M=I_p$. 
+
+```{r,eval=F}
+n=nrow(OzoneC)
+p=ncol(OzoneC)
+W<- 1/n * diag(1,n)
+M<-diag(1,p)
+
+```
+
+
+**Question :** Quelle matrice cherche-t-on à diagonaliser dans ce cadre en ACP ?
+Programmez cette matrice (rappelons que la multiplication matricielle est `%*%`) et diagonalisez-la à l'aide de la fonction `eigen()`.
+
+```{r,eval=F}
+Gamma<- t(OzoneC) %*% W %*% OzoneC# A COMPLETER
+A<-eigen(Gamma) 
+Gamma
+A
+```
+
+
+**Question :** Que représentent les valeurs propres (`A$values`) dans ce cas ? Que représente la somme de ces valeurs propres ? Vérifiez numériquement. 
+
+```{r,eval=F}
+# A COMPLETER
+inertie=sum(OzoneC^2)/n
+inertie2=sum(A$values)
+inertie
+inertie2
+```
+
+
+**Question :** Calculez les pourcentages (cumulés ou non) d'inertie portés par chaque axe. Combien de composantes principales décidez-vous de retenir ? Vous pouvez vous aider des fonctions `sum()` et `cumsum()`. 
+
+```{r}
+# A COMPLETER
+A$values/sum(A$values)
+A$values[2]
+A$values[1]
+boxplot(OzoneC)
+```
+
+**Question :** Que représentent les vecteurs propres (`A$vectors`) ? Construisez la matrice $C$ des composantes principales et vérifiez que la matrice $C$ est de dimension $n\times p$. Que représentent les coordonnées de la première colonne de $C$ ?
+
+```{r}
+C=(A$vectors)
+C
+# A COMPLETER
+```
+
+
+## Avec le package FactoMineR
+
+Rassurez-vous, nous avons programmé les étapes de l'ACP à des fins pédagogiques. En pratique, on utilise la librairie `FactoMineR`. Et on s'appuie sur la librairie `factoextra` pour les graphiques. 
+
+On commence par programmer l'ACP centrée (pas réduite, `scale.unit=F`). On peut déclarer à la fonction `PCA` des variables qualitatives et quantitatives supplémentaires, ainsi que des individus supplémentaires. Ces éléments ne sont donc pas utilisés pour calculer l'ACP mais peuvent être exploités par la suite. Ici, on déclare donc les deux variables qualitatives *pluie* et *vent* supplémentaires. On trace ensuite les valeurs propres avec la fonction `fviz_eig()`. 
+
+```{r,eval=F}
+respca<-PCA(Ozone,quali.sup=c(11,12),scale.unit = F,graph=F)
+respca$eig
+fviz_eig(respca)
+```
+
+
+### Etude des individus 
+
+**Question :** Que contient la sortie `respca$ind$coord$` ? Comparez avec les résultats de la partie précédente ? Vérifiez visuellement à l'aide de la commande `fviz_pca_ind(respca)`.  
+
+```{r,eval=F}
+fviz_pca_ind(respca,geom=c("point"))
+```
+
+**Question :** Que représentent les graphiques suivants ? Commentez. 
+
+```{r,eval=F}
+fviz_pca_ind(respca,col.ind="contrib",geom=c("point"))
+fviz_pca_ind(respca,geom=c("point"),select.ind = list(cos2=0.95))
+fviz_pca_ind(respca,habillage=11,geom=c("point"))
+fviz_pca_ind(respca,habillage=12,geom=c("point"))
+```
+
+### Etude des variables
+
+**Question :** On représente le graphique des corrélations entre les variables initiales et les méta-variables. Commentez.
+
+```{r,eval=F}
+plot(respca,choix="varcor")
+```
+
+**Question :** Afin de visualiser les corrélations des variables initiales avec toutes les méta-variables, utilisez la fonction `coorplot()`. Commentez. 
+
+```{r,eval=F}
+corrplot(respca$var$cor,method="ellipse")
+```
+
+# ACP centrée réduite
+
+## A la main 
+
+On fait maintenant une analyse en composantes principales sur les données centrées et réduites. 
+ 
+```{r,eval=F}
+s<-sqrt((n-1)*apply(OzoneC,2,var)/n)
+OzoneCR<-OzoneC%*%diag(1/s)
+OzoneCR
+```
+
+**Question :** Comparez `OzoneCR` avec `scale(Ozone[,-c(11,12)])`.
+
+```{r}
+# A COMPLETER
+scale(Ozone[,-c(11,12)])
+```
+
+**Question :** Quelle matrice cherche-t-on à diagonaliser dans ce cadre en ACP ?
+Programmez cette matrice et diagonalisez-la à l'aide de la fonction `eigen()`.
+
+```{r,eval=F}
+Gamma2<-t(OzoneCR) %*% W %*% OzoneCR # A COMPLETER
+B<-eigen(Gamma2)  
+Gamma2
+B
+```
+
+**Question :** Que représentent les valeurs propres dans ce cas ? Que représente la somme de ces valeurs propres ? Vérifiez numériquement. 
+
+```{r,eval=F}
+# A COMPLETER
+inertie =sum(OzoneCR^2)/n
+inertie3=sum(B$values)
+inertie
+inertie3
+```
+
+**Question :** Comment peut-on obtenir les résultats de cette ACP centrée réduite à partir du tableau de données centrées. Vérifiez numériquement. 
+
+```{r,eval=F}
+# A COMPLETER
+OzoneCR<-OzoneC%*%diag(1/s)
+OzoneCR
+```
+
+
+## Avec FactoMineR
+
+**Question :**
+On fait une ACP centrée réduite à l'aide de la fonction `PCA()` de la librairie `FactoMineR` en imposant `scale.unit=T` et on trace  les valeurs propres à l'aide de `fviz_eig()` de la librairie `factoextra`. Interprétez les résultats. 
+
+```{r,eval=F}
+respca2<-PCA(Ozone,quali.sup=c(11,12),scale.unit=T,graph=F)
+respca2$eig
+fviz_eig(respca2)
+```
+
+**Question :** Représentez le graphe des individus et celui des variables à l'aide des fonctions `fviz_pca_ind()`et `fviz_pca_var()` dans le premier plan factoriel. Quelles différences remarquez-vous avec l'ACP centrée ? 
+
+```{r}
+# A COMPLETER
+fviz_pca_ind(respca2,col.ind="contrib",geom=c("point"))
+fviz_pca_var(respca2,col.var="contrib")
+```
+
+**Question :** Afin de visualiser les corrélations des variables intiales avec toutes les méta-variables, utilisez la fonction `corrplot()`. Commentez.
+
+```{r}
+# A COMPLETER
+corrplot(respca2$var$cor,method="ellipse")
+```
+
+**Question :** Poursuivez l'exploitation des résultats en regardant d'autres plans factoriels, en exploitant l'information des variables qualitatives *pluie* et *vent*. 
+
+```{r}
+# A COMPLETER
+```
+
+
