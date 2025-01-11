@@ -50,8 +50,13 @@ library(reshape2)
 
 ## Descriptîon du jeu de données
 ```{r}
-gen <- read.table("DataProjet3MIC-2425.txt",header=T)
-summary(gen)
+Gen <- read.table("DataProjet3MIC-2425.txt",header=T,sep=";")
+summary(Gen)
+head(Gen,10)
+str(Gen)
+
+
+
 ```
 
 # Conclusion
@@ -69,17 +74,10 @@ Les données étudiées dans ce TP ont été recueillies à Rennes dans $112$ st
 On charge les données, on transforme les variables qualitatives *pluie* et *vent*, et on supprime la dernière variable que l'on n'utilisera pas dans ce TP. 
 
 ```{r,eval=F}
-Ozone<-read.table("Ozone.txt",header=T)
-Ozone$pluie<-as.factor(Ozone$pluie)
-Ozone$vent<-as.factor(Ozone$vent)
-Ozone<-Ozone[,-11]
-summary(Ozone)   
-```
-
-Ainsi on a un jeu de données composé de $n=112$ individus et $p=12$ variables.
-
-```{r,eval=F}
-dim(Ozone)
+Gen$ExpT1<-as.factor(Gen$ExpT1)
+Gen$ExpT2<-as.factor(Gen$ExpT2)
+Gen$ExpT3<-as.factor(Gen$ExpT3)
+summary(Gen)   
 ```
 
 
@@ -87,30 +85,25 @@ dim(Ozone)
 
 
 ```{r,eval=F}
-ggplot(melt(Ozone[,-c(11,12)]),aes(x=variable,y=value))+geom_boxplot()
+ggplot(melt(Gen[,-c(37,38,39)]),aes(x=variable,y=value))+geom_boxplot()
 
-g1<-ggplot(Ozone,aes(x=maxO3))+geom_density()
-g2<-ggplot(melt(Ozone[,c(2:4)]),aes(x=value,color=variable))+geom_density()
-g3<-ggplot(melt(Ozone[,c(5:7)]),aes(x=value,color=variable))+geom_density()
-g4<-ggplot(melt(Ozone[,c(8:10)]),aes(x=value,color=variable))+geom_density()
-grid.arrange(g1,g2,g3,g4,ncol=2)
-
-ggplot(Ozone, aes(x = pluie)) +  
-  geom_bar(aes(y = (..count..)/sum(..count..)))+ylab("")+ggtitle("Frequences")
-
-quan <- as.vector(table(Ozone$vent))/nrow(Ozone)
-df <- data.frame(group = levels(Ozone$vent),value = quan)
-ggplot(df, aes(x="", y=value, fill=group))+geom_bar(width = 1, stat = "identity")+ coord_polar("y", start=0)+ theme(legend.position="bottom")
 ```
 
 **Question :** Représentez graphiquement les corrélations des
 variables quantitatives (vous pourrez utiliser la fonction `corrplot()`).
 Quelles sont les variables linéairement corrélées (ou non) ?
 
+
+les resultat obtenus dans le replica 1 sont correlé positivement avec les resultat du replica 2 
+T2 et T3 sont correle positivemen entre eux mais T1 et T3 ne le sont pas
+T1 et T2 sont independant
+
+T1 a 6h est legerement correlé negativement avec T2 et T3
+
 ```{r}
 # A COMPLETER
-oquanti=Ozone[,-c(11,12)]
-corrplot(cor(oquanti),method="ellipse")
+gquanti=Gen[,-c(37,38,39)]
+corrplot(cor(gquanti),method="ellipse")
 ```
 
 
@@ -119,8 +112,8 @@ corrplot(cor(oquanti),method="ellipse")
 Dans cette section, on décide de faire une analyse en composantes principales (ACP) sur les données centrées. A l'aide de la fonction `scale()`, centrez les données. Vérifiez que les variables sont bien centrées avec `apply(...,2,mean)`.
 
 ```{r,eval=F}
-OzoneC<-scale(Ozone[,-c(11,12)],center=TRUE,scale=FALSE) # A COMPLETER
-apply(OzoneC,2,mean)
+GenT<-as.data.frame(t(Gen))
+GenT
 ```
 
 
