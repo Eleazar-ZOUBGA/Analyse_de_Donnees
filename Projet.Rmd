@@ -153,7 +153,7 @@ fviz_pca_ind(respca2,habillage=37,geom=c("point"))
 fviz_pca_ind(respca,col.ind="contrib",geom=c("point"))
 
 plot(respca,choix="varcor",axes=c(1,2))
-plot(respca,choix="varcor",axes=c(4,5))
+plot(respca,choix="varcor",axes=c(1,5))
 ````
 
 ```{r}
