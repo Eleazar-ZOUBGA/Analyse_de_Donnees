@@ -278,9 +278,11 @@ ggplot(df,aes(x=K,y=Iintra))+
 
 
 set.seed(123)
-kmeans_res <- kmeans(DataExpMoy[,-c(19,20,21)], centers = 3, nstart = 25)
+kmeans_res <- kmeans(DataExpMoy[,-c(19,20,21)], centers = 6, nstart = 25)
 fviz_cluster(kmeans_res, data = DataExpMoy[,-c(19,20,21)])
-kmeans_res <- kmeans(DataExpMoy[,-c(19,20,21)], centers = 5, nstart = 25)
+table(DataExpMoy$ExpT1,kmeans_res$cluster)
+
+kmeans_res <- kmeans(DataExpMoy[,-c(19,20,21)], centers = 4, nstart = 25)
 fviz_cluster(kmeans_res, data = DataExpMoy[,-c(19,20,21)])
 
 Classif<-kmeans(DataExpMoy[,-c(19,20,21)],3,nstart=25)
