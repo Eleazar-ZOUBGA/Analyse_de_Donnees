@@ -1,0 +1,313 @@
+---
+title: "Projet d'Analyse de Données"
+author: "Eléazar, Léo, Kenza"
+date: "2025-01-11"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: '4'
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    number_sections: true
+header-includes: \usepackage{comment}
+params:
+  soln: true
+---
+
+```{css,echo=F}
+.badCode {
+background-color: #cfdefc; 
+}
+
+.corrO { background-color: rgb(255,238,237); }
+.corrS { background-color: pink; color: black; border: 1px solid red; }
+```
+
+```{r setup, echo=FALSE, cache=TRUE, message=F,warning=F}
+library(knitr)
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=FALSE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               class.source="badCode")
+opts_knit$set(width=75)
+```
+
+## Introduction
+### Description du projet et des objectifs
+
+Ce projet vise à analyser le jeu de données `DataProjet3MIC-2425.txt` en explorant les différences d'expression des gènes selon différents traitements et temps, ainsi qu'à travers des analyses statistiques et multivariées.
+
+```{r,echo=T, error=F,warning=F,message=F}
+## Pour faire le TP
+#library(tidyverse)
+library(readr)
+library(corrplot)
+library(FactoMineR)
+library(factoextra)
+library(dplyr)
+library(BioStatR)
+```
+
+```{r data-loading}
+data <- read.table("DataProjet3MIC-2425.txt", header = TRUE, sep = ";")
+
+# Conversion des colonnes appropriées en format numérique
+data <- data %>%
+  mutate(across(starts_with("T"), as.numeric))
+```
+
+## Exploration des données
+
+### Structure et résumé des données
+
+```{r data-summary}
+#str(data)
+summary(data)
+cat("Le jeu de données contient les variables suivantes:\n")
+#µprint(colnames(data))
+```
+
+
+## Analyse uni-dimensionnelle
+
+### Histogrammes et boxplots
+
+```{r univariate-analysis}
+# Exemple pour une variable
+hist(data$T1_1H_R1, main = "Histogramme de T1_1H_R1", xlab = "Expression", col = "blue")
+boxplot(data$T1_1H_R1, main = "Boxplot de T1_1H_R1", col = "green")
+```
+
+## Analyse bi-dimensionnelle
+
+### Matrice de corrélation
+
+```{r correlation-matrix}
+cor_matrix <- cor(data[, grepl("T[1-3]_[1-6]H_R[1-2]", colnames(data))], use = "complete.obs")
+corrplot(cor_matrix, method = "circle")
+
+eta2(data$T1_6H_R1,data$ExpT1)
+ggplot(data,aes(x=data$ExpT1,y=data$T1_6H_R1))+
+geom_boxplot()#var quantitative avec qualitative
+
+eta2(data$T2_6H_R1,data$ExpT2)
+ggplot(data,aes(x=data$ExpT2,y=data$T2_6H_R1))+
+geom_boxplot()#var quantitative avec qualitative
+
+eta2(data$T3_6H_R1,data$ExpT3)
+eta2(data$T2_6H_R1,data$ExpT3)
+eta2(data$T1_6H_R1,data$ExpT3)#choisir lequel on garde et faire avec tte les varibales quantitative avec une boucle
+ggplot(data,aes(x=data$ExpT3,y=data$T3_6H_R1))+
+geom_boxplot()#var quantitative avec qualitative
+
+```
+
+```{r}
+
+#qualitative avec qualitative
+prop.table(table(data$ExpT1,data$ExpT2),margin=1)
+prop.table(table(data$ExpT1,data$ExpT3),margin=1)
+prop.table(table(data$ExpT2,data$ExpT3),margin=1)
+
+ggplot(data,aes(x=data$ExpT1,fill=data$ExpT2))+
+geom_bar(position = "fill")
+
+ggplot(data,aes(x=data$ExpT1,fill=data$ExpT3))+
+geom_bar(position = "fill")
+
+ggplot(data,aes(x=data$ExpT2,fill=data$ExpT3))+
+geom_bar(position = "fill")
+
+```
+Dans 5 cas sur 6 ExpT2 et ExpT3 donnent le meme resultat (-> Analyse bi-d Quali-Quali,Quanti-Quali (eta2), Unidimentionnelle sur qualitatif : Camember T2 T3 tres similaire )
+
+
+### Scatterplot
+
+```{r scatterplot}
+#a deplacer dans la partie bi dimentionnelle quantitative exemple
+plot(data$T1_1H_R1, data$T1_2H_R1, main = "Scatterplot T1_1H_R1 vs T1_2H_R1", xlab = "T1_1H_R1", ylab = "T1_2H_R1")
+```
+
+## Analyse en composantes principales (ACP)
+
+### ACP des T_t_sH_Rr
+
+```{r pca-tts}
+acp_data <- data[, grepl("T[1-3]_[1-6]H_R[1]", colnames(data))]
+acp_res <- PCA(acp_data, scale.unit = TRUE, graph = FALSE)
+
+# Résultats
+fviz_eig(acp_res)
+fviz_pca_ind(acp_res, repel = T, col.ind = "black", title = "ACP des individus")
+fviz_pca_var(acp_res, repel = TRUE, col.var = "blue", title = "Corrélation des variables avec les composantes principales")
+```
+
+## Clustering
+
+### K-means sur les T_t_sH_Rr
+
+```{r clustering-tts}
+set.seed(123)
+kmeans_res <- kmeans(acp_data, centers = 3, nstart = 25)
+fviz_cluster(kmeans_res, data = acp_data)
+
+
+```
+
+## Analyse des gènes
+
+### Construction de DataExpMoy
+
+```{r dataexp-creation}
+# Vérifier les colonnes commençant par "T" et calculer la moyenne
+DataExpMoy <- data
+  select(matches("^T[1-3]_[1-6]H_R[1-2]")) %>%
+  group_by(Gene = row_number()) %>%
+  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)))
+#DataExpMoy
+
+# Ajouter les colonnes ExpT1, ExpT2, ExpT3
+DataExpMoy <- cbind(DataExpMoy, data %>% select(matches("^ExpT[1-3]")))
+#DataExpMoy
+
+apply(data[,1:19],2,tapply, data$T1_1H_R1, mean)
+df <- data.frame(data$T1_1H_R1,data$T1_1H_R2)
+Moy <- rowMeans(df[, c("data$T1_1H_R1","data$T1_1H_R2")])
+```
+
+```{r dataexp-creation}
+d1<-data[,c(1:18)]
+d2<-data[,c(19:36)]
+DataExpMoy<-(d1+d2)/2
+DataExpMoy<-cbind(DataExpMoy, data %>% select(matches("^ExpT[1-3]")))
+DataExpMoy
+```
+
+
+### ACP pour les gènes
+
+```{r pca-genes}
+acp_genes <- PCA(DataExpMoy[, grepl("T[1-3]_[1-6]H", colnames(DataExpMoy))], scale.unit = TRUE, graph = FALSE)
+acp_genes$eig
+DataExpMoy$ExpT1<-as.factor(DataExpMoy$ExpT1)
+DataExpMoy$ExpT2<-as.factor(DataExpMoy$ExpT2)
+DataExpMoy$ExpT3<-as.factor(DataExpMoy$ExpT3)
+# Résultats
+fviz_eig(acp_genes)
+fviz_pca_ind(acp_genes, repel = F, col.ind = "black", title = "ACP des gènes",habillage=DataExpMoy$ExpT1)
+fviz_pca_ind(acp_genes, repel = F, col.ind = "black", title = "ACP des gènes",habillage=DataExpMoy$ExpT2)
+fviz_pca_ind(acp_genes, repel = F, col.ind = "black", title = "ACP des gènes",habillage=DataExpMoy$ExpT3)
+
+fviz_pca_var(acp_genes, repel = T, col.var = "blue", title = "Corrélation des variables avec les composantes principales")
+
+```
+
+
+une partie des genes non exprimé par T2 sont sur exprimer par T1 -> visible dans le T3
+
+pour les variables la dimension 2 semble correspondre aux cas ou les genes sont non exprimer.
+
+
+### Clustering des gènes
+
+#### Sur leurs expressions
+
+```{r clustering-genes-expression}
+set.seed(123)
+kmeans_genes <- kmeans(DataExpMoy[, grepl("T[1-3]_[1-6]H", colnames(DataExpMoy))], centers = 3, nstart = 25)
+fviz_cluster(kmeans_genes, data = DataExpMoy[, grepl("T[1-3]_[1-6]H", colnames(DataExpMoy))])
+```
+
+#### Sur ExpT1, ExpT2 et ExpT3
+
+```{r clustering-genes-expT}
+# Filtrer les données pour expT1, expT2, expT3
+filtered_data <- data %>%
+  select(contains("ExpT1") | contains("ExpT2") | contains("ExpT3"))
+
+# Conversion des colonnes en facteurs ordonnés, puis en numériques
+filtered_data_num <- filtered_data %>%
+  mutate(across(everything(), ~ as.numeric(factor(.x, levels = c("Non", "Sous", "Sur")))))
+
+# Vérification des données converties
+#print(filtered_data_num)
+
+# Vérifiez le nombre de points distincts
+num_distinct <- nrow(unique(filtered_data_num))
+cat("Nombre de points distincts :", num_distinct, "\n")
+
+# Ajustez le nombre de centres dynamiquement
+centers <- min(3, num_distinct)
+if (centers < 2) {
+  stop("Pas assez de points distincts pour effectuer un clustering.")
+}
+
+# Exécution de K-means avec les données converties
+set.seed(123)
+kmeans_exp <- kmeans(filtered_data_num, centers = centers, nstart = 25)
+
+# Visualisation des clusters
+fviz_cluster(kmeans_exp, data = filtered_data_num)
+```
+```{r}
+Kmax<-15
+reskmeanscl<-matrix(0,nrow=nrow(DataExpMoy[,-c(19,20,21)]),ncol=Kmax-1)
+Iintra<-NULL
+for (k in 2:Kmax){
+  resaux<-kmeans(DataExpMoy[,-c(19,20,21)],center=k)
+  reskmeanscl[,k-1]<-resaux$cluster
+  Iintra<-c(Iintra,resaux$tot.withinss)
+}
+
+df<-data.frame(K=2:15,Iintra=Iintra)
+ggplot(df,aes(x=K,y=Iintra))+
+  geom_line()+
+  geom_point()+
+  xlab("Nombre de classes")+
+  ylab("Inertie intraclasse")
+
+
+
+set.seed(123)
+kmeans_res <- kmeans(DataExpMoy[,-c(19,20,21)], centers = 3, nstart = 25)
+fviz_cluster(kmeans_res, data = DataExpMoy[,-c(19,20,21)])
+kmeans_res <- kmeans(DataExpMoy[,-c(19,20,21)], centers = 5, nstart = 25)
+fviz_cluster(kmeans_res, data = DataExpMoy[,-c(19,20,21)])
+
+Classif<-kmeans(DataExpMoy[,-c(19,20,21)],3,nstart=25)
+aux<-silhouette(Classif$cl, daisy(DataExpMoy[,-c(19,20,21)]))
+fviz_silhouette(aux)+theme(plot.title = element_text(size =9))
+
+Silhou<-NULL
+for (k in 2:Kmax){
+   aux<-silhouette(reskmeanscl[,k-1], daisy(DataExpMoy[,-c(19,20,21)]))
+   Silhou<-c(Silhou,mean(aux[,3]))
+}
+
+df<-data.frame(K=2:Kmax,Silhouette=Silhou)
+ggplot(df,aes(x=K,y=Silhouette))+
+  geom_point()+
+  geom_line()+theme(legend.position = "bottom")
+
+aux<-silhouette(kmeans_res$cluster, daisy(DataExpMoy[,-c(19,20,21)]))
+fviz_silhouette(aux)+
+  theme(plot.title = element_text(size =9))
+rm(df,Silhou,aux)
+
+Classif<-kmeans(DataExpMoy[,-c(19,20,21)],5,nstart=25)
+aux<-silhouette(Classif$cl, daisy(DataExpMoy[,-c(19,20,21)]))
+fviz_silhouette(aux)+theme(plot.title = element_text(size =9))
+```
+
+
+## Conclusion
+Résumé des résultats et interprétations des analyses effectuées.

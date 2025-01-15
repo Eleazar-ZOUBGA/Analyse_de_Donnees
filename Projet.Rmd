@@ -44,6 +44,7 @@ library(gridExtra)
 library(forcats)
 library(reshape2)
 library(BioStatR)
+library(cluster)
 ```
 
 <<<<<<< HEAD
@@ -56,6 +57,9 @@ Gen <- read.table("DataProjet3MIC-2425.txt",header=T,sep=";")
 summary(Gen)
 head(Gen,10)
 str(Gen)
+Gen$ExpT1<-as.factor(Gen$ExpT1)
+Gen$ExpT2<-as.factor(Gen$ExpT2)
+Gen$ExpT3<-as.factor(Gen$ExpT3)
 
 
 
@@ -136,31 +140,80 @@ summary(data)
 Dans cette section, on décide de faire une analyse en composantes principales (ACP) sur les données centrées. A l'aide de la fonction `scale()`, centrez les données. Vérifiez que les variables sont bien centrées avec `apply(...,2,mean)`.
 
 ```{r,eval=F}
+
 GenT<-as.data.frame(t(Gen[,-c(37,38,39)]))
 #GenCT<-scale(GenT, center = TRUE)
 #respca2=PCA(Gen[,grep1("T[1-3]_[1-6]H_R[1-2]",colnames(Gen))])
 t(c(37,38,39))
 c(37,38,39)
-respca2=PCA(GenT,scale.unit=T,graph=F,quali.sup=t(c(37,38,39)))
+respca2=PCA(GenT,scale.unit=T,graph=F)
 respca2$eig
 fviz_eig(respca2)
 
-respca<-PCA(GenT,scale.unit = T,graph=F)
-respca$eig
-fviz_eig(respca)
-fviz_pca_ind(respca2,habillage=37,geom=c("point"))
+#respca<-PCA(GenT,scale.unit = T,graph=F)
+#respca$eig
+#fviz_eig(respca)
+fviz_pca_ind(respca2,geom=c("point"))
 
-fviz_pca_ind(respca,col.ind="contrib",geom=c("point"))
+fviz_pca_ind(respca2,col.ind="contrib",geom=c("text"))
 
-plot(respca,choix="varcor",axes=c(1,2))
-plot(respca,choix="varcor",axes=c(1,5))
+fviz_pca_var(respca2,habillage=Gen$ExpT1,axes=c(1,2))#faire un interpretation pour chaque Exp (T1,T2,T3)
+fviz_pca_var(respca2,habillage=Gen$ExpT2,axes=c(1,2))
+fviz_pca_var(respca2,habillage=Gen$ExpT3,axes=c(1,2))
+#plot(respca,choix="varcor",axes=c(1,5))
 ````
 
 ```{r}
-respca$var$cor
-corrplot(respca$var$cor[c(1:10),],method="ellipse")
+Kmax<-15
+reskmeanscl<-matrix(0,nrow=nrow(GenT),ncol=Kmax-1)
+Iintra<-NULL
+for (k in 2:Kmax){
+  resaux<-kmeans(GenT,center=k)
+  reskmeanscl[,k-1]<-resaux$cluster
+  Iintra<-c(Iintra,resaux$tot.withinss)
+}
+
+df<-data.frame(K=2:15,Iintra=Iintra)
+ggplot(df,aes(x=K,y=Iintra))+
+  geom_line()+
+  geom_point()+
+  xlab("Nombre de classes")+
+  ylab("Inertie intraclasse")
+
+
+
+set.seed(123)
+kmeans_res <- kmeans(GenT, centers = 3, nstart = 25)
+fviz_cluster(kmeans_res, data = GenT)
+kmeans_res <- kmeans(GenT, centers = 5, nstart = 25)
+fviz_cluster(kmeans_res, data = GenT)
+
+Classif<-kmeans(GenT,3,nstart=25)
+aux<-silhouette(Classif$cl, daisy(GenT))
+fviz_silhouette(aux)+theme(plot.title = element_text(size =9))
+
+Silhou<-NULL
+for (k in 2:Kmax){
+   aux<-silhouette(reskmeanscl[,k-1], daisy(GenT))
+   Silhou<-c(Silhou,mean(aux[,3]))
+}
+
+df<-data.frame(K=2:Kmax,Silhouette=Silhou)
+ggplot(df,aes(x=K,y=Silhouette))+
+  geom_point()+
+  geom_line()+theme(legend.position = "bottom")
+
+aux<-silhouette(kmeans_res$cluster, daisy(GenT))
+fviz_silhouette(aux)+
+  theme(plot.title = element_text(size =9))
+rm(df,Silhou,aux)
+
+Classif<-kmeans(GenT,5,nstart=25)
+aux<-silhouette(Classif$cl, daisy(GenT))
+fviz_silhouette(aux)+theme(plot.title = element_text(size =9))
 
 ```
+
 
 
 
